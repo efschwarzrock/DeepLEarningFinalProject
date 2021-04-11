@@ -166,8 +166,8 @@ def pickMove(state):
 
 def update(oldState, move, newState, accuracy):
     #TODO update to change correct things
-    old = stateActionPairs[oldState[0]][oldState[1]][move]
-    return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(stateActionPairs[newState[0]][newState[1]])))
+    old = StateActionPairs[oldState['layer_depth']][getIndexState(oldState[1])][getIndexState(move)]
+    return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
 
 def done():
     #TODO return true if we reached a termination state
@@ -181,7 +181,7 @@ def trainModel():
 
 def getOriginalState():
     #TODO return the original state
-    pass
+    return
 
 def archiveFindings(accuracy):
     #TODO store the model and the resulting accuracy in the archive
@@ -210,9 +210,11 @@ def numToStrLength(num, length):
 '''###########################################################################
 ##############################################################################
 ###########################################################################'''
+#the curent state of the model
 curState = getOriginalState()
 
-StateActionPairs = np.zeros(shape=(MAXLAYERS, NUMSTATES, NUMACTIONS))
+#The state action pairs
+StateActionPairs = np.zeros(shape=(MAXLAYERS+1, NUMSTATES, NUMACTIONS))
 
 #the number of generations/trials run(howmany models have we trained)
 gens = 0
@@ -220,25 +222,39 @@ gens = 0
 #a debugging incremetor
 its = 0
 
-
-
+x = getOriginalState()
+print(x)
 
 
 while gens < 10000:
+    #pick a move
     move = pickMove(curState)
+
+    #store the old state
     oldState = list(curState)#TODO update to fit archetecture
+
+    #make the move and get the new state
     makeMove(move)
     newState = list(curState)#TODO update to fit archetecture
 
+    #Check if we need to train the model
     if done():
+        #we need to train so train and archive the model
         accuracy = trainModel()
         archiveFindings(accuracy)
+
+        #update the Q Values and give a reward of accuracy
         update(oldState, move, newState, accuracy)
+
+        #set back to original state and increase generation
         curState = getOriginalState()
         gens = gens + 1
+
+        #Do stuff the paper says
         randArchiveUpdate()
         epsilonDecay(gens)
     else:
+        #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
         update(oldState, move, newState, 0)
 
 
