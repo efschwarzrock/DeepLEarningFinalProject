@@ -134,7 +134,7 @@ def getIndexState(state):
 ###########################################################################'''
 
 
-
+#not sure that we still need this exactly? I think there is no "move" here, we just give the next layer
 def makeMove(action):
     #TODO takes in an action and updates the curent state and the model.
     #The current state should just have the layerdepth and what the curent layer is i.e. convo pooling ect
@@ -142,46 +142,45 @@ def makeMove(action):
     #we may also want to store the input size so that we can update the representation size correctly
     pass
 
+#return the best next layer based on the state action table
+def getBestNextLayer(current_layer):
+    return add_layer(current_layer, False)
 
+#return a random next layer
+def getRandNextLayer(current_layer):
+    return add_layer(current_layer, True)
 
-
-
-def pickBestAction(state):
-    #TODO return the best action based on the state action table
-    #this is the action that has the highest num value in the table
-    pass
-
-
-def getRandAction(state):
-    #TODO return a random action that state can move to
-    pass
-
-
-def pickMove(state):
+#generate next layer
+def getNextLayer(current_layer):
     r = np.random.rand()
     if r > epsilon:
-        return pickBestAction(state)
+        return getBestNextLayer(current_layer)
     else:
-        return getRandAction(state)
-
+        return getRandNextLayer(current_layer)
+    
+#TO DO: update this, should only need old state and new state
 def update(oldState, move, newState, accuracy):
     #TODO update to change correct things
     old = StateActionPairs[oldState['layer_depth']][getIndexState(oldState[1])][getIndexState(move)]
     return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
 
-def done():
-    #TODO return true if we reached a termination state
-    pass
+#return True if we are at a termination layer
+#only have softmax for now
+def done(layer):
+    if layer['type'] == 'softmax':
+        return True
+    return False
 
+#train architecture if we have not already, or get its reward from the table
+def trainModel(layers):
+    #if we've already trained this model, get from table
+    #otherwise, train the model
+    model = create_model(layers)
+    return evaluate_model(model)
 
-def trainModel():
-    #TODO see if we allready built that model and if not build and train the model, return the accuracy
-    #Model will most likly be a global variable
-    pass
-
-def getOriginalState():
-    #TODO return the original state
-    return
+#get the first layer in the architecture
+def getFirstLayer():
+    return add_layer(0);
 
 def archiveFindings(accuracy):
     #TODO store the model and the resulting accuracy in the archive
@@ -195,7 +194,6 @@ def randArchiveUpdate():
 def epsilonDecay(gens):
     #TODO reduce epsilon so the model becomes more and more greedy
     pass
-
 
 def numToStrLength(num, length):
     if num > 99:
@@ -211,7 +209,8 @@ def numToStrLength(num, length):
 ##############################################################################
 ###########################################################################'''
 #the curent state of the model
-curState = getOriginalState()
+current_layer = getFirstLayer()
+layers = [current_layer]
 
 #The state action pairs
 StateActionPairs = np.zeros(shape=(MAXLAYERS+1, NUMSTATES, NUMACTIONS))
@@ -222,11 +221,8 @@ gens = 0
 #a debugging incremetor
 its = 0
 
-x = getOriginalState()
-print(x)
-
-
 while gens < 10000:
+    '''
     #pick a move
     move = pickMove(curState)
 
@@ -236,18 +232,26 @@ while gens < 10000:
     #make the move and get the new state
     makeMove(move)
     newState = list(curState)#TODO update to fit archetecture
+    '''
+    
+    #get next layer
+    next_layer = getNextLayer(current_layer)
+    layers.append(next_layer)
 
     #Check if we need to train the model
-    if done():
+    if done(next_layer):
         #we need to train so train and archive the model
-        accuracy = trainModel()
+        accuracy = trainModel(layers)
         archiveFindings(accuracy)
 
         #update the Q Values and give a reward of accuracy
-        update(oldState, move, newState, accuracy)
+        #update(oldState, move, newState, accuracy)
+        #I don't think we need to pass in move here?
+        update(current_layer, next_layer, accuracy);
 
         #set back to original state and increase generation
-        curState = getOriginalState()
+        current_layer = getFirstLayer()
+        layers = [current_layer]
         gens = gens + 1
 
         #Do stuff the paper says
@@ -255,7 +259,8 @@ while gens < 10000:
         epsilonDecay(gens)
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
-        update(oldState, move, newState, 0)
+        #update(oldState, move, newState, 0)
+        update(current_layer, next_layer, 0)
 
 
     its = its+1
@@ -318,7 +323,7 @@ def get_layers():
 # NOTES
 # -currently does not account for representation size
 # -no global average pooling
-def add_layer(current):
+def add_layer(current, random):
     # get possible layers and current layer depth
     layers = get_layers()
     current_depth = 0
@@ -344,6 +349,7 @@ def add_layer(current):
     elif current['type'] == 'dense' and current['consecutive'] == parameters['dense_consecutive']:
         next_layers = layers['termination']
 
+    #TO DO: if random = True, do this, otherwise get best value out of table
     # randomly select next layer
     rand = random.randint(0, len(next_layers) - 1)
     next_layer = next_layers[rand]
@@ -421,7 +427,7 @@ def evaluate_model(model, batch_size, epochs, x_train, y_train, x_val, y_val):
     print('\n', 'Accuracy:', score[1])
     return score[1]
 
-
+'''
 # Load the fashion-mnist pre-shuffled train data and test data
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
 print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
@@ -458,3 +464,4 @@ architecture = generate_architecture()
 model = create_model(architecture)
 print(model.summary())
 evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
+'''
