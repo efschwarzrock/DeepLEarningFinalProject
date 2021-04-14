@@ -313,13 +313,13 @@ def getTerminationStateIndex(state):
 
 #TODO takes in a state or action and returns the index of it in the table
 def getStateIndex(state):
-    if state['type'] == 'Convolution':
+    if state['type'] == 'convolution':
         return getConvolutionStateIndex(state)
-    elif state['type'] == 'Pooling':
+    elif state['type'] == 'pooling':
         return getPoolingStateIndex(state)
-    elif state['type'] == 'Dense':
+    elif state['type'] == 'dense':
         return getFullStateIndex(state)
-    elif state['type'] == 'Softmax':
+    elif state['type'] == 'softmax':
         return getTerminationStateIndex(state)
 
 #TODO takes in an index and returns the state or action it coresponds to
