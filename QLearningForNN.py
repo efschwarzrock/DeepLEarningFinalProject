@@ -28,6 +28,9 @@ MAXLAYERS = 5
 #the state names as used in the model
 STATENAMES = {"Convolution", "Pooling", "FullyConected", "Termination"}
 
+#Dictionary to store the architecture
+saved_architecture = {}
+
 current_layer = 0
 
 
@@ -366,19 +369,21 @@ def getFirstLayer():
     else:
         return add_layer(0, True);
 
+# take the architecture_name and accuracy, and store it
+## str() it when inputting
+def archiveFindings(architecture_name, accuracy):
+    saved_architecture[architecture_name] = accuracy
 
-def archiveFindings(accuracy):
-    #TODO store the model and the resulting accuracy in the archive
-    pass
 
 def randArchiveUpdate():
     #TODO randomly sample 100 models from the dictionary and update the Q Values(IDK what exactly its supposed to do)
     #its described on page 6 paragraph right under the table
-    pass
+    #select 100 models here for now
+    return r.sample(list(saved_architecture.items()), 100)
 
+# get current epsilon given generation
 def epsilonDecay(gens):
-    #TODO reduce epsilon so the model becomes more and more greedy
-    pass
+    return 1 - gens * 0.0001
 
 def numToStrLength(num, length):
     if num > 99:
