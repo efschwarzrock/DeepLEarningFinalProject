@@ -25,9 +25,6 @@ NUMSTATES = NUMACTIONS - NumTerminationActions
 #max number of layers
 MAXLAYERS = 5
 
-#the state names as used in the model
-STATENAMES = {"Convolution", "Pooling", "FullyConected", "Termination"}
-
 #Dictionary to store the architecture
 saved_architecture = {}
 
@@ -114,10 +111,13 @@ def add_layer(current, random):
     elif current['type'] == 'dense' and current['consecutive'] == parameters['dense_consecutive']:
         next_layers = layers['termination']
 
-    #TO DO: if random = True, do this, otherwise get best value out of table
     # randomly select next layer
-    rand = r.randint(0, len(next_layers) - 1)
-    next_layer = next_layers[rand]
+    if random:
+        rand = r.randint(0, len(next_layers) - 1)
+        next_layer = next_layers[rand]
+    # select best next layer
+    else:
+        next_layer = find_best(current, next_layers, current_depth)
 
     # update layer depth
     next_layer['layer_depth'] = current_depth + 1
@@ -132,6 +132,18 @@ def add_layer(current, random):
         next_layer['consecutive'] = current['consecutive'] + 1
     return next_layer
 
+#given the current layer and possible next layers, find the best one
+def find_best(current, next_layers, depth):
+    best = 0
+    best_layer = None
+    for layer in next_layers:
+        current_index = getStateIndex(current)
+        next_index = getStateIndex(layer)
+        accuracy = StateActionPairs[depth][current_index][next_index]
+        if accuracy > best:
+            best = accuracy
+            best_layer = layer
+    return layer
 
 # generate a random architecture with specified parameters
 def generate_architecture():
@@ -301,13 +313,13 @@ def getTerminationStateIndex(state):
 
 #TODO takes in a state or action and returns the index of it in the table
 def getStateIndex(state):
-    if state['type'] == STATENAMES[0]:
+    if state['type'] == 'Convolution':
         return getConvolutionStateIndex(state)
-    elif state['type'] == STATENAMES[1]:
+    elif state['type'] == 'Pooling':
         return getPoolingStateIndex(state)
-    elif state['type'] == STATENAMES[2]:
+    elif state['type'] == 'Dense':
         return getFullStateIndex(state)
-    elif state['type'] == STATENAMES[3]:
+    elif state['type'] == 'Softmax':
         return getTerminationStateIndex(state)
 
 #TODO takes in an index and returns the state or action it coresponds to
@@ -317,8 +329,6 @@ def getIndexState(state):
 '''###########################################################################
 ##############################################################################
 ###########################################################################'''
-
-
 
 def makeMove(action):
     #TODO update input size, update actions representation size
@@ -342,7 +352,6 @@ def getNextLayer(current_layer):
     else:
         return getRandNextLayer(current_layer)
     
-
 def update(oldState, newState, accuracy):
     old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
     return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
@@ -357,9 +366,13 @@ def done(layer):
 #train architecture if we have not already, or get its reward from the table
 def trainModel(layers):
     #if we've already trained this model, get from table
+    if str(layers) in saved_architecture:
+        accuracy = saved_architecture[str(layers)]
     #otherwise, train the model
-    model = create_model(layers)
-    return evaluate_model(model)
+    else:
+        model = create_model(layers)
+        accuracy = evaluate_model(model)
+    return accuracy
 
 #get the first layer in the architecture
 def getFirstLayer():
@@ -437,7 +450,7 @@ while gens < 10000:
     if done(next_layer):
         #we need to train so train and archive the model
         accuracy = trainModel(layers)
-        archiveFindings(accuracy)
+        archiveFindings(str(layers), accuracy)
 
         #update the Q Values and give a reward of accuracy
         update(current_layer, newState, accuracy);
