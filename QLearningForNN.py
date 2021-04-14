@@ -340,8 +340,8 @@ def getNextLayer(current_layer):
         return getRandNextLayer(current_layer)
     
 
-def update(oldState, move, newState, accuracy):
-    old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(move)]
+def update(oldState, newState, accuracy):
+    old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
     return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
 
 #return True if we are at a termination layer
@@ -435,10 +435,7 @@ while gens < 10000:
         archiveFindings(accuracy)
 
         #update the Q Values and give a reward of accuracy
-        #update(oldState, move, newState, accuracy)
-        #I don't think we need to pass in move here?
-        #We will(bc reference size thing) might as well add it now
-        update(current_layer, next_layer, newState, accuracy);
+        update(current_layer, newState, accuracy);
 
         #set back to original state and increase generation
         #TODO update Q value
