@@ -5,7 +5,7 @@ import random as r
 import copy
 
 #Chance of taking a random action
-epsilon = .8
+epsilon = .5
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
 stepSize = .1
@@ -29,6 +29,60 @@ MAXLAYERS = 5
 saved_architecture = {}
 
 current_layer = 0
+
+
+# Load the fashion-mnist pre-shuffled train data and test data
+(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
+
+# normalize
+x_train = x_train.astype('float32') / 255
+x_test = x_test.astype('float32') / 255
+
+# Further break training data into train / validation sets (# put 5000 into validation set and keep remaining 55,000 for train)
+(x_train, x_valid) = x_train[5000:], x_train[:5000]
+(y_train, y_valid) = y_train[5000:], y_train[:5000]
+
+# Reshape input data from (28, 28) to (28, 28, 1)
+w, h = 28, 28
+x_train = x_train.reshape(x_train.shape[0], w, h, 1)
+x_valid = x_valid.reshape(x_valid.shape[0], w, h, 1)
+x_test = x_test.reshape(x_test.shape[0], w, h, 1)
+
+# One-hot encode the labels
+y_train = tf.keras.utils.to_categorical(y_train, 10)
+y_valid = tf.keras.utils.to_categorical(y_valid, 10)
+y_test = tf.keras.utils.to_categorical(y_test, 10)
+
+# Print training set shape
+print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
+
+# Print the number of training, validation, and test datasets
+print(x_train.shape[0], 'train set')
+print(x_valid.shape[0], 'validation set')
+print(x_test.shape[0], 'test set')
+
+
+
+
+#the curent state of the model
+current_layer = None
+layers = None
+print(layers)
+#The state action pairs
+StateActionPairs = np.zeros(shape=(MAXLAYERS+1, NUMSTATES, NUMACTIONS))
+
+#the number of generations/trials run(howmany models have we trained)
+gens = 0
+
+#a debugging incremetor
+its = 0
+
+#The input size of the next layer
+inputSize = 128
+
+
+
 
 
 parameters = {
@@ -86,12 +140,12 @@ def get_layers():
 # -currently does not account for representation size
 # -no global average pooling
 def add_layer(current, random):
-    # get possible layers and current layer depth
-    layers = get_layers()
+    #print("\ncurrent = ", current)
     current_depth = 0
     if current != 0:
         current_depth = current['layer_depth']
-
+    # get possible layers and current layer depth
+    layers = get_layers()
     # at beginning, can go to convolution or pooling
     if current == 0:
         next_layers = layers['convolution'] + layers['pooling']
@@ -117,11 +171,12 @@ def add_layer(current, random):
         next_layer = next_layers[rand]
     # select best next layer
     else:
-        next_layer = find_best(current, next_layers, current_depth)
+        next_layer = find_best(current, next_layers, current_depth)##############!!!!!!!!!!!!!
 
     # update layer depth
+    #print("start - ", next_layer)
     next_layer['layer_depth'] = current_depth + 1
-
+    #print("end - ", next_layer)
     if current == 0:
         return next_layer
 
@@ -134,16 +189,28 @@ def add_layer(current, random):
 
 #given the current layer and possible next layers, find the best one
 def find_best(current, next_layers, depth):
-    best = 0
     best_layer = None
-    for layer in next_layers:
-        current_index = getStateIndex(current)
-        next_index = getStateIndex(layer)
-        accuracy = StateActionPairs[depth][current_index][next_index]
-        if accuracy > best:
-            best = accuracy
-            best_layer = layer
-    return layer
+    if depth != 0:
+        best = -1
+        for layer in next_layers:
+            current_index = getStateIndex(current)
+            next_index = getStateIndex(layer)
+            accuracy = StateActionPairs[depth][current_index][next_index]
+            if accuracy > best:
+                best = accuracy
+                best_layer = layer
+    else:
+        best = -1
+        for layer in next_layers:
+            current_index = 0
+            next_index = getStateIndex(layer)
+            accuracy = StateActionPairs[depth][current_index][next_index]
+            if accuracy > best:
+                best = accuracy
+                best_layer = layer
+
+
+    return best_layer
 
 # generate a random architecture with specified parameters
 def generate_architecture():
@@ -333,28 +400,29 @@ def getIndexState(state):
 def makeMove(action):
     #TODO update input size, update actions representation size
     layers.append(action)
+    global current_layer
     current_layer = action
     pass
 
 #return the best next layer based on the state action table
-def getBestNextLayer(current_layer):
-    return add_layer(current_layer, False)
+def getBestNextLayer(curr_layer):
+    return add_layer(curr_layer, False)
 
 #return a random next layer
-def getRandNextLayer(current_layer):
-    return add_layer(current_layer, True)
+def getRandNextLayer(curr_layer):
+    return add_layer(curr_layer, True)
 
 #generate next layer
-def getNextLayer(current_layer):
+def getNextLayer(curr_layer):
     r = np.random.rand()
     if r > epsilon:
-        return getBestNextLayer(current_layer)
+        return getBestNextLayer(curr_layer)
     else:
-        return getRandNextLayer(current_layer)
+        return getRandNextLayer(curr_layer)
     
 def update(oldState, newState, accuracy):
     old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
-    return old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+    StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
 
 #return True if we are at a termination layer
 #only have softmax for now
@@ -365,20 +433,23 @@ def done(layer):
 
 #train architecture if we have not already, or get its reward from the table
 def trainModel(layers):
+    #return np.random.rand();
     #if we've already trained this model, get from table
     if str(layers) in saved_architecture:
         accuracy = saved_architecture[str(layers)]
     #otherwise, train the model
     else:
+        #why don't we use test data?
         model = create_model(layers)
-        accuracy = evaluate_model(model)
+        accuracy = evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
     return accuracy
 
 #get the first layer in the architecture
 def getFirstLayer():
     r = np.random.rand()
+
     if r > epsilon:
-        return add_layer(0, False);
+        return add_layer(0, False);####!!!!!!!!!!!!!!!!!
     else:
         return add_layer(0, True);
 
@@ -399,42 +470,45 @@ def epsilonDecay(gens):
     return 1 - gens * 0.0001
 
 def numToStrLength(num, length):
-    if num > 99:
-        num = 99
-    if num < -99:
-        num = -99
+    if num > 999:
+        num = 999
+    if num < -999:
+        num = -999
     s = str(num)
     s = s.center(length)
     return s
+
+def printStateAction(arr):
+    for i in range(len(arr)):
+        print("layer ", i, " {\n")
+        for j in range(len(arr[i])):
+            s = ""
+            for k in range(len(arr[i][j])):
+                s = s + numToStrLength(round(arr[i][j][k]*1000), 3) + ", "
+            print("[", s, "]\n")
+        print("}\n")
+
+def printLayers(l):
+    for i in range(len(l)):
+        print(l[i])
 
 
 '''###########################################################################
 ##############################################################################
 ###########################################################################'''
+
 #the curent state of the model
 current_layer = getFirstLayer()
 layers = [current_layer]
 
-#The state action pairs
-StateActionPairs = np.zeros(shape=(MAXLAYERS+1, NUMSTATES, NUMACTIONS))
-
-#the number of generations/trials run(howmany models have we trained)
-gens = 0
-
-#a debugging incremetor
-its = 0
-
-#The input size of the next layer
-inputSize = 128
-
-x = getFirstLayer()
-print(x)
-print(type(x))
 
 
-while gens < 10000:
+
+
+while gens < 10:
 
     #pick a next layer
+    #print("\n\noutside - ", current_layer)
     next_layer = getNextLayer(current_layer)
 
     #store the old state
@@ -442,19 +516,22 @@ while gens < 10000:
 
     #make the move and get the new state
     makeMove(next_layer)
-
+    #print("update - ", current_layer)
     newState = copy.deepcopy(current_layer)
 
 
     #Check if we need to train the model
     if done(next_layer):
+        printLayers(layers)
         #we need to train so train and archive the model
         accuracy = trainModel(layers)
         archiveFindings(str(layers), accuracy)
-
+        print(accuracy, "--------------")
         #update the Q Values and give a reward of accuracy
-        update(current_layer, newState, accuracy);
-
+        #print("befor\n", StateActionPairs)
+        #printStateAction(StateActionPairs)
+        update(oldState, newState, accuracy);
+        #print("after\n", StateActionPairs, "\n\n\n\n")
         #set back to original state and increase generation
         #TODO update Q value
         current_layer = getFirstLayer()
@@ -462,54 +539,29 @@ while gens < 10000:
         gens = gens + 1
 
         #Do stuff the paper says
-        randArchiveUpdate()
-        epsilonDecay(gens)
+        #randArchiveUpdate()
+        #epsilonDecay(gens)
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
         #update(oldState, move, newState, 0)
-        update(current_layer, next_layer, newState, 0)
+        update(current_layer, newState, 0)
 
 
     its = its+1
 
-
-
+printStateAction(StateActionPairs)
 
 '''
-# Load the fashion-mnist pre-shuffled train data and test data
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
-print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
-
-# normalize
-x_train = x_train.astype('float32') / 255
-x_test = x_test.astype('float32') / 255
-
-# Further break training data into train / validation sets (# put 5000 into validation set and keep remaining 55,000 for train)
-(x_train, x_valid) = x_train[5000:], x_train[:5000]
-(y_train, y_valid) = y_train[5000:], y_train[:5000]
-
-# Reshape input data from (28, 28) to (28, 28, 1)
-w, h = 28, 28
-x_train = x_train.reshape(x_train.shape[0], w, h, 1)
-x_valid = x_valid.reshape(x_valid.shape[0], w, h, 1)
-x_test = x_test.reshape(x_test.shape[0], w, h, 1)
-
-# One-hot encode the labels
-y_train = tf.keras.utils.to_categorical(y_train, 10)
-y_valid = tf.keras.utils.to_categorical(y_valid, 10)
-y_test = tf.keras.utils.to_categorical(y_test, 10)
-
-# Print training set shape
-print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
-
-# Print the number of training, validation, and test datasets
-print(x_train.shape[0], 'train set')
-print(x_valid.shape[0], 'validation set')
-print(x_test.shape[0], 'test set')
-
 # generate random architecture and evaluate
 architecture = generate_architecture()
 model = create_model(architecture)
 print(model.summary())
 evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
 '''
+
+'''
+Can the first layer be fully connected? def add_layer(current, random):
+We don't use test data at all? def trainModel(layers):
+randArchiveUpdate() threw an error, I just commented it out
+'''
+
