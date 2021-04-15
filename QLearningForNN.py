@@ -427,6 +427,7 @@ def update(oldState, newState, accuracy):
 #return True if we are at a termination layer
 #only have softmax for now
 def done(layer):
+    #TODO update to other thing
     if layer['type'] == 'softmax':
         return True
     return False
@@ -564,4 +565,9 @@ Can the first layer be fully connected? def add_layer(current, random):
 We don't use test data at all? def trainModel(layers):
 randArchiveUpdate() threw an error, I just commented it out
 '''
+
+#TODO Erich - state to index-  update Q for first layer - make move function
+#TODO baian - randArchiveUpdate bug fix
+#TODO Veronica - add more layer types
+#TODO Erich and Veronica - update rep size
 
