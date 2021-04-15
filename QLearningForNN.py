@@ -570,4 +570,5 @@ randArchiveUpdate() threw an error, I just commented it out
 #TODO baian - randArchiveUpdate bug fix
 #TODO Veronica - add more layer types
 #TODO Erich and Veronica - update rep size
+#TODO fix done function to handle 2nd termination type
 
