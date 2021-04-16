@@ -1,10 +1,15 @@
+import json
+
 import numpy as np
 import tensorflow as tf
 from keras.callbacks import ModelCheckpoint
 import random as r
 import copy
+from saveArchitecture import saveArchitecture
 
 #Chance of taking a random action
+
+
 epsilon = .5
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
@@ -26,13 +31,17 @@ NUMSTATES = NUMACTIONS - NumTerminationActions
 MAXLAYERS = 5
 
 #Dictionary to store the architecture
-saved_architecture = {}
+saved_architecture = saveArchitecture("a")
 
 current_layer = 0
 
 
 # Load the fashion-mnist pre-shuffled train data and test data
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+# x_test = np.reshape(np.load("fashion_mnist_test_images.npy"), (-1, 28 * 28))
+# y_test = np.load("fashion_mnist_test_labels.npy")
+# x_train = np.reshape(np.load("fashion_mnist_train_images.npy"), (-1, 28 * 28))
+# y_train = np.load("fashion_mnist_train_labels.npy")
 print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
 
 # normalize
@@ -472,16 +481,36 @@ def getFirstLayer():
     else:
         return add_layer(0, True);
 
-# take the architecture_name and accuracy, and store it
-## str() it when inputting
-def archiveFindings(architecture_name, accuracy):
-    saved_architecture[architecture_name] = accuracy
-
-
 def randArchiveUpdate():
     #TODO randomly sample 100 models from the dictionary and update the Q Values(IDK what exactly its supposed to do)
     #its described on page 6 paragraph right under the table
 
+    # get 100 sample from save_architectures
+    sampleSize = len(saved_architecture.getKeys())
+    if sampleSize >= 100:
+        sampleSize = 100
+
+    samples = r.sample(list(saved_architecture.getKeys()), sampleSize)
+    # each sample is a long string separated by "|"
+    for sample in samples:
+        # to get each layer, split by "|", and get the dict structure
+        acc = saved_architecture.getValueByString(sample)
+        layerList = []
+        layers = sample.split("|")
+
+        # construct the model (list of dist)
+        for layer in layers:
+            layerList += json.loads(layer)
+
+        # apply them to update function
+        for l in range(len(layerList), 0):
+            if l == len(layerList) - 1:
+                update(layerList[l-1]["type"], layerList[l]["type"], acc)
+            elif l == 1:
+                update(0, layerList[0]["type"], 0)
+            else:
+                update(layerList[l-1]["type"], layerList[l]["type"], 0)
+    return
     #so what it does is for each model you just call update but in revese order.
     #eaxmple, model [(convo1), (pool), (convo2), (dence), (softmax)], with accuracy "acc"
     # you would call the function update(oldLayer, newLayer, accuracy) in this order
@@ -490,7 +519,7 @@ def randArchiveUpdate():
     # update(pool, convo2, 0)
     # update(convo1, pool, 0)
     # update(0, convo1, 0)
-    return r.sample(list(saved_architecture.items()), 100)
+
 
 # get current epsilon given generation
 def epsilonDecay(gens):
@@ -556,7 +585,7 @@ while gens < 10:
         printLayers(layers)
         #we need to train so train and archive the model
         accuracy = trainModel(layers)
-        archiveFindings(str(layers), accuracy)
+        saved_architecture.archiveFindings(layers, accuracy)
         print(accuracy, "--------------")
         #update the Q Values and give a reward of accuracy
         #print("befor\n", StateActionPairs)
@@ -570,7 +599,7 @@ while gens < 10:
         gens = gens + 1
         inputSize = 28
         #Do stuff the paper says
-        #randArchiveUpdate()
+        randArchiveUpdate()
         #epsilonDecay(gens)
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
