@@ -596,7 +596,7 @@ We don't use test data at all? def trainModel(layers):
 randArchiveUpdate() threw an error, I just commented it out
 '''
 
-#TODO Erich - state to index - make move function
+#TODO Erich - state to index
 #TODO baian - randArchiveUpdate bug fix
 #TODO Veronica - add more layer types
 #TODO Erich and Veronica - update rep size
