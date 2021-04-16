@@ -79,7 +79,7 @@ gens = 0
 its = 0
 
 #The input size of the next layer
-inputSize = 128
+inputSize = 28
 
 
 
@@ -399,6 +399,17 @@ def getIndexState(state):
 
 def makeMove(action):
     #TODO update input size, update actions representation size
+    global inputSize
+    #Pooling
+    # new input size = roundup((input -(size-1))/stride))
+    if action['type'] == 'pooling':
+        inputSize = np.ceil((inputSize - (action['pool_size'] - 1))/action['stride'])
+    if inputSize > 7:
+        action['representation_size'] = 3
+    elif inputSize > 3:
+        action['representation_size'] = 2
+    else:
+        action['representation_size'] = 1
     layers.append(action)
     global current_layer
     current_layer = action
@@ -421,8 +432,15 @@ def getNextLayer(curr_layer):
         return getRandNextLayer(curr_layer)
     
 def update(oldState, newState, accuracy):
-    old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
-    StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+    if oldState != 0:
+        old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
+        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+    else:
+        old = StateActionPairs[0][0][getStateIndex(newState)]
+        StateActionPairs[0][0][getStateIndex(newState)] = old * (
+                    1 - stepSize) + stepSize * (accuracy + discout * (
+            np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+
 
 #return True if we are at a termination layer
 #only have softmax for now
@@ -434,7 +452,7 @@ def done(layer):
 
 #train architecture if we have not already, or get its reward from the table
 def trainModel(layers):
-    #return np.random.rand();
+    return np.random.rand();
     #if we've already trained this model, get from table
     if str(layers) in saved_architecture:
         accuracy = saved_architecture[str(layers)]
@@ -463,7 +481,15 @@ def archiveFindings(architecture_name, accuracy):
 def randArchiveUpdate():
     #TODO randomly sample 100 models from the dictionary and update the Q Values(IDK what exactly its supposed to do)
     #its described on page 6 paragraph right under the table
-    #select 100 models here for now
+
+    #so what it does is for each model you just call update but in revese order.
+    #eaxmple, model [(convo1), (pool), (convo2), (dence), (softmax)], with accuracy "acc"
+    # you would call the function update(oldLayer, newLayer, accuracy) in this order
+    # update(dence, softmax, acc)
+    # update(convo2, dence, 0)
+    # update(pool, convo2, 0)
+    # update(convo1, pool, 0)
+    # update(0, convo1, 0)
     return r.sample(list(saved_architecture.items()), 100)
 
 # get current epsilon given generation
@@ -500,7 +526,11 @@ def printLayers(l):
 
 #the curent state of the model
 current_layer = getFirstLayer()
-layers = [current_layer]
+
+layers = []
+makeMove(current_layer)
+
+
 
 
 
@@ -534,11 +564,11 @@ while gens < 10:
         update(oldState, newState, accuracy);
         #print("after\n", StateActionPairs, "\n\n\n\n")
         #set back to original state and increase generation
-        #TODO update Q value
         current_layer = getFirstLayer()
-        layers = [current_layer]
+        update(0, current_layer, 0)# update the chossing of the first layer
+        makeMove(current_layer)
         gens = gens + 1
-
+        inputSize = 28
         #Do stuff the paper says
         #randArchiveUpdate()
         #epsilonDecay(gens)
@@ -550,7 +580,7 @@ while gens < 10:
 
     its = its+1
 
-printStateAction(StateActionPairs)
+#printStateAction(StateActionPairs)
 
 '''
 # generate random architecture and evaluate
@@ -566,7 +596,7 @@ We don't use test data at all? def trainModel(layers):
 randArchiveUpdate() threw an error, I just commented it out
 '''
 
-#TODO Erich - state to index-  update Q for first layer - make move function
+#TODO Erich - state to index - make move function
 #TODO baian - randArchiveUpdate bug fix
 #TODO Veronica - add more layer types
 #TODO Erich and Veronica - update rep size
