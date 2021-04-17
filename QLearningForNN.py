@@ -505,11 +505,11 @@ def randArchiveUpdate():
         # apply them to update function
         for l in range(len(layerList), 0):
             if l == len(layerList) - 1:
-                update(layerList[l-1]["type"], layerList[l]["type"], acc)
+                update(layerList[l-1], layerList[l], acc)
             elif l == 1:
-                update(0, layerList[0]["type"], 0)
+                update(0, layerList[0], 0)
             else:
-                update(layerList[l-1]["type"], layerList[l]["type"], 0)
+                update(layerList[l-1], layerList[l], 0)
     return
     #so what it does is for each model you just call update but in revese order.
     #eaxmple, model [(convo1), (pool), (convo2), (dence), (softmax)], with accuracy "acc"
