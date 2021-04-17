@@ -1,5 +1,4 @@
 import json
-
 import numpy as np
 import tensorflow as tf
 from keras.callbacks import ModelCheckpoint
@@ -8,15 +7,13 @@ import copy
 from saveArchitecture import saveArchitecture
 
 #Chance of taking a random action
-
-
 epsilon = .5
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
 stepSize = .1
 
 #discounting future rewards(i.e. is it beter to get 5 points now or 50 points in 200 moves, but 50 is uncertain)
-discout = .9
+discount = .9
 
 #the number of layer types
 NUMACTIONS = 4
@@ -28,13 +25,12 @@ NumTerminationActions = 1
 NUMSTATES = NUMACTIONS - NumTerminationActions
 
 #max number of layers
-MAXLAYERS = 5
+MAXLAYERS = 12
 
 #Dictionary to store the architecture
 saved_architecture = saveArchitecture("a")
 
 current_layer = 0
-
 
 # Load the fashion-mnist pre-shuffled train data and test data
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
@@ -71,9 +67,6 @@ print(x_train.shape[0], 'train set')
 print(x_valid.shape[0], 'validation set')
 print(x_test.shape[0], 'test set')
 
-
-
-
 #the curent state of the model
 current_layer = None
 layers = None
@@ -90,23 +83,16 @@ its = 0
 #The input size of the next layer
 inputSize = 28
 
-
-
-
-
 parameters = {
-    "max_layers": 5,
-    "conv_num_filters": [64],
-    "conv_filter_sizes": [2],
+    "max_layers": 12,
+    "conv_num_filters": [64, 128, 256, 512],
+    "conv_filter_sizes": [1, 3, 5],
     "conv_strides": [1],
-    "conv_representation_sizes": [0],
-    "pooling_sizes_strides": [(2, 1)],
-    "pooling_representation_sizes": [0],
-    "dense_consecutive": 2,
-    "dense_nodes": [128],
+    "pooling_sizes_strides": [(5, 3), (3, 2), (2, 2)],
+    "dense_consecutive": 3,
+    "dense_nodes": [128, 256, 512],
     "classes": 10
 }
-
 
 # creates all possible layers from specified parameters
 def get_layers():
@@ -115,15 +101,13 @@ def get_layers():
     for i in parameters['conv_num_filters']:
         for j in parameters['conv_filter_sizes']:
             for k in parameters['conv_strides']:
-                for l in parameters['conv_representation_sizes']:
-                    convolutions.append({'type': 'convolution', 'num_filters': i, 'filter_size': j, 'stride': k,
-                                         'representation_size': l})
+                convolutions.append({'type': 'convolution', 'num_filters': i, 'filter_size': j, 'stride': k,
+                                     'representation_size': 0})
 
     # create pooling layers
     poolings = []
     for i in parameters['pooling_sizes_strides']:
-        for j in parameters['pooling_representation_sizes']:
-            poolings.append({'type': 'pooling', 'pool_size': i[0], 'stride': i[1], 'representation_size': j})
+        poolings.append({'type': 'pooling', 'pool_size': i[0], 'stride': i[1], 'representation_size': 0})
 
     # create dense layers
     denses = []
@@ -144,9 +128,7 @@ def get_layers():
 
 # given current layer, randomly choose next layer
 # pass in 0 for current if starting
-
 # NOTES
-# -currently does not account for representation size
 # -no global average pooling
 def add_layer(current, random):
     #print("\ncurrent = ", current)
@@ -161,12 +143,16 @@ def add_layer(current, random):
     # if at max depth, return termination state
     elif current_depth == parameters['max_layers'] - 1:
         next_layers = layers['termination']
-    # if at convolution, can go to anything
-    elif current['type'] == 'convolution':
+    # if at convolution, can go to anything (can only go to dense if representation size is bin 1 or 2)
+    elif current['type'] == 'convolution' and current['representation_size'] < 3:
         next_layers = layers['convolution'] + layers['pooling'] + layers['dense'] + layers['termination']
-    # if at pooling, can go to anything but pooling
-    elif current['type'] == 'pooling':
+    elif current['type'] == 'convolution' and current['representation_size'] >=3:
+        next_layers = layers['convolution'] + layers['pooling'] + layers['termination']
+    # if at pooling, can go to anything but pooling (can only go to dense if representation size is bin 1 or 2)
+    elif current['type'] == 'pooling' and current['representation_size'] < 3:
         next_layers = layers['convolution'] + layers['dense'] + layers['termination']
+    elif current['type'] == 'pooling' and current['representation_size'] >=3:
+        next_layers = layers['convolution'] + layers['termination']
     # if at dense and not at max fully connected, can go to another dense or termination
     elif current['type'] == 'dense' and current['consecutive'] != parameters['dense_consecutive']:
         next_layers = layers['dense'] + layers['termination']
@@ -174,6 +160,18 @@ def add_layer(current, random):
     elif current['type'] == 'dense' and current['consecutive'] == parameters['dense_consecutive']:
         next_layers = layers['termination']
 
+    #remove filter/pooling sizes that are greater than inputSize
+    temp = []
+    for layer in next_layers:
+        if layer['type'] == 'convolution':
+            if layer['filter_size'] < inputSize:
+                temp.append(layer)
+        if layer['type'] == 'pooling':
+            if layer['pool_size'] < inputSize:
+                temp.append(layer)
+            
+    next_layers = temp
+            
     # randomly select next layer
     if random:
         rand = r.randint(0, len(next_layers) - 1)
@@ -195,6 +193,7 @@ def add_layer(current, random):
     if next_layer['type'] == 'dense' and current['type'] == 'dense':
         next_layer['consecutive'] = current['consecutive'] + 1
     return next_layer
+
 
 #given the current layer and possible next layers, find the best one
 def find_best(current, next_layers, depth):
@@ -443,13 +442,12 @@ def getNextLayer(curr_layer):
 def update(oldState, newState, accuracy):
     if oldState != 0:
         old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
-        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discout*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discount*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
     else:
         old = StateActionPairs[0][0][getStateIndex(newState)]
         StateActionPairs[0][0][getStateIndex(newState)] = old * (
-                    1 - stepSize) + stepSize * (accuracy + discout * (
+                    1 - stepSize) + stepSize * (accuracy + discount * (
             np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
-
 
 #return True if we are at a termination layer
 #only have softmax for now
@@ -558,12 +556,6 @@ current_layer = getFirstLayer()
 
 layers = []
 makeMove(current_layer)
-
-
-
-
-
-
 
 while gens < 10:
 
