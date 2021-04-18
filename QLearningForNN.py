@@ -7,22 +7,22 @@ import copy
 from saveArchitecture import saveArchitecture
 
 #Chance of taking a random action
-epsilon = .5
+epsilon = 1
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
-stepSize = .1
+stepSize = 1
 
 #discounting future rewards(i.e. is it beter to get 5 points now or 50 points in 200 moves, but 50 is uncertain)
 discount = .9
 
 #the number of layer types
-NUMACTIONS = 4
+NUMACTIONS = 19
 
 #the number of termination layers
 NumTerminationActions = 1
 
 #number of states we can be in
-NUMSTATES = NUMACTIONS - NumTerminationActions
+NUMSTATES = 48
 
 #max number of layers
 MAXLAYERS = 12
@@ -89,7 +89,7 @@ parameters = {
     "conv_filter_sizes": [1, 3, 5],
     "conv_strides": [1],
     "pooling_sizes_strides": [(5, 3), (3, 2), (2, 2)],
-    "dense_consecutive": 3,
+    "dense_consecutive": 2,
     "dense_nodes": [128, 256, 512],
     "classes": 10
 }
@@ -166,15 +166,17 @@ def add_layer(current, random):
         if layer['type'] == 'convolution':
             if layer['filter_size'] < inputSize:
                 temp.append(layer)
-        if layer['type'] == 'pooling':
+        elif layer['type'] == 'pooling':
             if layer['pool_size'] < inputSize:
                 temp.append(layer)
-            
+        else:
+            temp.append(layer)
+
     next_layers = temp
             
     # randomly select next layer
     if random:
-        rand = r.randint(0, len(next_layers) - 1)
+        rand = r.randint(0, len(next_layers)-1)
         next_layer = next_layers[rand]
     # select best next layer
     else:
@@ -182,6 +184,7 @@ def add_layer(current, random):
 
     # update layer depth
     #print("start - ", next_layer)
+
     next_layer['layer_depth'] = current_depth + 1
     #print("end - ", next_layer)
     if current == 0:
@@ -202,7 +205,7 @@ def find_best(current, next_layers, depth):
         best = -1
         for layer in next_layers:
             current_index = getStateIndex(current)
-            next_index = getStateIndex(layer)
+            next_index = getActionIndex(layer)
             accuracy = StateActionPairs[depth][current_index][next_index]
             if accuracy > best:
                 best = accuracy
@@ -211,7 +214,7 @@ def find_best(current, next_layers, depth):
         best = -1
         for layer in next_layers:
             current_index = 0
-            next_index = getStateIndex(layer)
+            next_index = getActionIndex(layer)
             accuracy = StateActionPairs[depth][current_index][next_index]
             if accuracy > best:
                 best = accuracy
@@ -292,22 +295,20 @@ def evaluate_model(model, batch_size, epochs, x_train, y_train, x_val, y_val):
 
 
 
-#TODO update these function to fit new model
 def getConvolutionStateIndex(state):
-    '''
-    RecepFieldSize = state[1] #{1, 3, 5}
+
+    RecepFieldSize = state['filter_size'] #{1, 3, 5}
     #the index of the size
     RecepFieldSizeI = 0
 
 
-    NumRecepFields = state[2] #{64, 128, 256, 512}
+    NumRecepFields = state['num_filters'] #{64, 128, 256, 512}
     #index of the numRecepFields
     NumRecepFieldsI = 0
 
 
-    RepSize = state[3] #{(∞, 8], (8, 4], (4, 1]}
-    #index of RepSize
-    RepSizeI = 0
+    RepSize = state['representation_size'] - 1 #{(∞, 8], (8, 4], (4, 1]}
+
 
     if RecepFieldSize == 1:
         RecepFieldSizeI = 0
@@ -325,21 +326,22 @@ def getConvolutionStateIndex(state):
     elif NumRecepFields == 512:
         NumRecepFieldsI = 3
 
-    ret = RecepFieldSizeI*12 + NumRecepFieldsI*3 + RepSizeI
-    '''
-    return 0
+    ret = RecepFieldSizeI*12 + NumRecepFieldsI*3 + RepSize
 
+    return ret
 
-def getPoolingStateIndex(state):
-    '''
-    RecepFieldSize = state[1]  # {(5, 3),(3, 2),(2, 2)}
-    # the index of the size
+def getConvolutionActionIndex(action):
+
+    RecepFieldSize = action['filter_size'] #{1, 3, 5}
+    #the index of the size
     RecepFieldSizeI = 0
 
 
-    RepSize = state[3]  # {(∞, 8], (8, 4], (4, 1]}
-    # index of RepSize
-    RepSizeI = 0
+    NumRecepFields = action['num_filters'] #{64, 128, 256, 512}
+    #index of the numRecepFields
+    NumRecepFieldsI = 0
+
+
 
     if RecepFieldSize == 1:
         RecepFieldSizeI = 0
@@ -348,17 +350,64 @@ def getPoolingStateIndex(state):
     elif RecepFieldSize == 5:
         RecepFieldSizeI = 2
 
-    ret = 3*3*4 + RecepFieldSizeI*3 + RepSizeI
-    '''
-    return 1
+    if NumRecepFields == 64:
+        NumRecepFieldsI = 0
+    elif NumRecepFields == 128:
+        NumRecepFieldsI = 1
+    elif NumRecepFields == 256:
+        NumRecepFieldsI = 2
+    elif NumRecepFields == 512:
+        NumRecepFieldsI = 3
+
+    ret = RecepFieldSizeI*4 + NumRecepFieldsI
+
+    return ret
+
+
+def getPoolingStateIndex(state):
+
+    RecepFieldSize = state['pool_size']  # {(5, 3),(3, 2),(2, 2)}
+    # the index of the size
+    RecepFieldSizeI = 0
+
+
+    RepSize = state['representation_size'] - 1 # {(∞, 8], (8, 4], (4, 1]}
+
+
+    if RecepFieldSize == 1:
+        RecepFieldSizeI = 0
+    elif RecepFieldSize == 3:
+        RecepFieldSizeI = 1
+    elif RecepFieldSize == 5:
+        RecepFieldSizeI = 2
+
+    ret = 3*3*4 + RecepFieldSizeI*3 + RepSize
+
+    return ret
+
+
+def getPoolingActionIndex(action):
+
+    RecepFieldSize = action['pool_size']  # {(5, 3),(3, 2),(2, 2)}
+    # the index of the size
+    RecepFieldSizeI = 0
+
+
+    if RecepFieldSize == 1:
+        RecepFieldSizeI = 0
+    elif RecepFieldSize == 3:
+        RecepFieldSizeI = 1
+    elif RecepFieldSize == 5:
+        RecepFieldSizeI = 2
+
+    ret = 3*4 + RecepFieldSizeI
+
+    return ret
 
 
 def getFullStateIndex(state):
-    '''
-    #the number of fully conected layers befor this one
-    NumConsecFullConec = state[1] # 0, 1
 
-    NumNeurons = state[2] # {512, 256, 128}
+    NumNeurons = state['nodes'] # {512, 256, 128}
     NumNeuronsI = 0
 
     if NumNeurons == 512:
@@ -367,26 +416,32 @@ def getFullStateIndex(state):
         NumNeuronsI = 1
     elif NumNeurons == 128:
             NumNeuronsI = 2
-    ret = 3*3*4 + 3*3 + NumConsecFullConec*3 + NumNeuronsI
-    '''
-    return 2
+    ret = 3*3*4 + 3*3 + NumNeuronsI
+
+    return ret
+
+def getFullActionIndex(action):
+
+    NumNeurons = action['nodes'] # {512, 256, 128}
+    NumNeuronsI = 0
+
+    if NumNeurons == 512:
+        NumNeuronsI = 0
+    elif NumNeurons == 256:
+        NumNeuronsI = 1
+    elif NumNeurons == 128:
+            NumNeuronsI = 2
+    ret = 3*4 + 3 + NumNeuronsI
+
+    return ret
 
 
 def getTerminationStateIndex(state):
-    '''
-    TermType = state[1]
-    TypeI = 0
-    if TermType == "Softmax":
-        TypeI = 0
-    else:
-        TypeI = 1
+    return 300
 
+def getTerminationActionIndex(action):
+    return 18
 
-    ret = 3 * 3 * 4 + 3 * 3 + 3 * 2 + TypeI
-    '''
-    return 3
-
-#TODO takes in a state or action and returns the index of it in the table
 def getStateIndex(state):
     if state['type'] == 'convolution':
         return getConvolutionStateIndex(state)
@@ -397,7 +452,16 @@ def getStateIndex(state):
     elif state['type'] == 'softmax':
         return getTerminationStateIndex(state)
 
-#TODO takes in an index and returns the state or action it coresponds to
+def getActionIndex(action):
+    if action['type'] == 'convolution':
+        return getConvolutionActionIndex(action)
+    elif action['type'] == 'pooling':
+        return getPoolingActionIndex(action)
+    elif action['type'] == 'dense':
+        return getFullActionIndex(action)
+    elif action['type'] == 'softmax':
+        return getTerminationActionIndex(action)
+
 def getIndexState(state):
     pass
 
@@ -406,7 +470,6 @@ def getIndexState(state):
 ###########################################################################'''
 
 def makeMove(action):
-    #TODO update input size, update actions representation size
     global inputSize
     #Pooling
     # new input size = roundup((input -(size-1))/stride))
@@ -440,26 +503,30 @@ def getNextLayer(curr_layer):
         return getRandNextLayer(curr_layer)
     
 def update(oldState, newState, accuracy):
-    if oldState != 0:
-        old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)]
-        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getStateIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discount*(np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+    if newState['type'] == 'softmax':
+        old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getActionIndex(newState)]
+        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getActionIndex(newState)] = old * (
+                    1 - stepSize) + stepSize * accuracy
+    elif oldState != 0:
+        old = StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getActionIndex(newState)]
+        StateActionPairs[oldState['layer_depth']][getStateIndex(oldState)][getActionIndex(newState)] = old*(1-stepSize) + stepSize*(accuracy + discount*(np.max(StateActionPairs[newState['layer_depth']][getStateIndex(newState)])))
     else:
-        old = StateActionPairs[0][0][getStateIndex(newState)]
-        StateActionPairs[0][0][getStateIndex(newState)] = old * (
+        old = StateActionPairs[0][0][getActionIndex(newState)]
+        StateActionPairs[0][0][getActionIndex(newState)] = old * (
                     1 - stepSize) + stepSize * (accuracy + discount * (
-            np.max(StateActionPairs[newState['layer_depth']][getIndexState(newState)])))
+            np.max(StateActionPairs[newState['layer_depth']][getStateIndex(newState)])))
 
 #return True if we are at a termination layer
 #only have softmax for now
 def done(layer):
-    #TODO update to other thing
     if layer['type'] == 'softmax':
         return True
     return False
 
 #train architecture if we have not already, or get its reward from the table
 def trainModel(layers):
-    return np.random.rand();
+    #TODO remove for actual running
+    #return np.random.rand();
     #if we've already trained this model, get from table
     if str(layers) in saved_architecture:
         accuracy = saved_architecture[str(layers)]
@@ -480,8 +547,7 @@ def getFirstLayer():
         return add_layer(0, True);
 
 def randArchiveUpdate():
-    #TODO randomly sample 100 models from the dictionary and update the Q Values(IDK what exactly its supposed to do)
-    #its described on page 6 paragraph right under the table
+
 
     # get 100 sample from save_architectures
     sampleSize = len(saved_architecture.getKeys())
@@ -498,13 +564,13 @@ def randArchiveUpdate():
 
         # construct the model (list of dist)
         for layer in layers:
-            layerList += json.loads(layer)
-
+            layerList.append(json.loads(layer))
         # apply them to update function
-        for l in range(len(layerList), 0):
-            if l == len(layerList) - 1:
+        for i in range(len(layerList)):
+            l = len(layerList) - (i+1)
+            if i == 0:
                 update(layerList[l-1], layerList[l], acc)
-            elif l == 1:
+            elif l == 0:
                 update(0, layerList[0], 0)
             else:
                 update(layerList[l-1], layerList[l], 0)
@@ -538,7 +604,8 @@ def printStateAction(arr):
         for j in range(len(arr[i])):
             s = ""
             for k in range(len(arr[i][j])):
-                s = s + numToStrLength(round(arr[i][j][k]*1000), 3) + ", "
+                if(round(arr[i][j][k]*1000) != 0):
+                    s = s + numToStrLength(round(arr[i][j][k]*1000), 3) + ", "
             print("[", s, "]\n")
         print("}\n")
 
@@ -554,8 +621,9 @@ def printLayers(l):
 #the curent state of the model
 current_layer = getFirstLayer()
 
-layers = []
-makeMove(current_layer)
+layers = [] #real
+makeMove(current_layer) #real
+
 
 while gens < 10:
 
@@ -568,7 +636,7 @@ while gens < 10:
 
     #make the move and get the new state
     makeMove(next_layer)
-    #print("update - ", current_layer)
+
     newState = copy.deepcopy(current_layer)
 
 
@@ -579,17 +647,18 @@ while gens < 10:
         accuracy = trainModel(layers)
         saved_architecture.archiveFindings(layers, accuracy)
         print(accuracy, "--------------")
+
         #update the Q Values and give a reward of accuracy
-        #print("befor\n", StateActionPairs)
-        #printStateAction(StateActionPairs)
         update(oldState, newState, accuracy);
+
+        inputSize = 28
+        layers = []
         #print("after\n", StateActionPairs, "\n\n\n\n")
         #set back to original state and increase generation
         current_layer = getFirstLayer()
         update(0, current_layer, 0)# update the chossing of the first layer
         makeMove(current_layer)
         gens = gens + 1
-        inputSize = 28
         #Do stuff the paper says
         randArchiveUpdate()
         #epsilonDecay(gens)
@@ -601,7 +670,7 @@ while gens < 10:
 
     its = its+1
 
-#printStateAction(StateActionPairs)
+printStateAction(StateActionPairs)
 
 '''
 # generate random architecture and evaluate
@@ -617,9 +686,7 @@ We don't use test data at all? def trainModel(layers):
 randArchiveUpdate() threw an error, I just commented it out
 '''
 
-#TODO Erich - state to index
-#TODO baian - randArchiveUpdate bug fix
-#TODO Veronica - add more layer types
-#TODO Erich and Veronica - update rep size
-#TODO fix done function to handle 2nd termination type
+
+
+
 
