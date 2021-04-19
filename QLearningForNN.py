@@ -475,6 +475,8 @@ def makeMove(action):
     # new input size = roundup((input -(size-1))/stride))
     if action['type'] == 'pooling':
         inputSize = np.ceil((inputSize - (action['pool_size'] - 1))/action['stride'])
+    if action['type'] == 'convolution':
+        inputSize = np.ceil((inputSize - (action['filter_size'] - 1)))
     if inputSize > 7:
         action['representation_size'] = 3
     elif inputSize > 3:
@@ -529,6 +531,7 @@ def trainModel(layers):
     #return np.random.rand();
     #if we've already trained this model, get from table
     if str(layers) in saved_architecture:
+    #if False:
         accuracy = saved_architecture[str(layers)]
     #otherwise, train the model
     else:
