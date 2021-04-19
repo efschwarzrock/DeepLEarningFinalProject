@@ -237,13 +237,13 @@ def create_tf_layer(layer):
     layer_depth = layer['layer_depth']
     if layer_type == 'convolution' and layer_depth == 1:
         tf_layer = tf.keras.layers.Conv2D(filters=layer['num_filters'], kernel_size=layer['filter_size'],
-                                          strides=layer['stride'], padding='same', input_shape=(28, 28, 1))
+                                          strides=layer['stride'], padding='valid', input_shape=(28, 28, 1))
     elif layer_type == 'pooling' and layer_depth == 1:
         tf_layer = tf.keras.layers.MaxPooling2D(pool_size=layer['pool_size'], strides=layer['stride'],
                                                 input_shape=(28, 28, 1))
     elif layer_type == 'convolution':
         tf_layer = tf.keras.layers.Conv2D(filters=layer['num_filters'], kernel_size=layer['filter_size'],
-                                          strides=layer['stride'], padding='same')
+                                          strides=layer['stride'], padding='valid')
     elif layer_type == 'pooling':
         tf_layer = tf.keras.layers.MaxPooling2D(pool_size=layer['pool_size'], strides=layer['stride'])
     elif layer_type == 'dense':
