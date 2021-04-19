@@ -530,9 +530,8 @@ def trainModel(layers):
     #TODO remove for actual running
     #return np.random.rand();
     #if we've already trained this model, get from table
-    if str(layers) in saved_architecture:
-    #if False:
-        accuracy = saved_architecture[str(layers)]
+    if saved_architecture.getValue(layers) is not None:
+        accuracy = saved_architecture.getValue(layers)
     #otherwise, train the model
     else:
         #why don't we use test data?
