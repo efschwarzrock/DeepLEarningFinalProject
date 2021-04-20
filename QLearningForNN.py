@@ -534,9 +534,9 @@ def trainModel(layers):
         accuracy = saved_architecture.getValue(layers)
     #otherwise, train the model
     else:
-        #why don't we use test data?
         model = create_model(layers)
-        accuracy = evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
+        #accuracy = evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
+        accuracy = np.random.rand();
     return accuracy
 
 #get the first layer in the architecture
@@ -673,6 +673,38 @@ while gens < 10:
     its = its+1
 
 printStateAction(StateActionPairs)
+
+
+#Save the state action pairs
+np.save("stateAction", StateActionPairs)
+
+a = np.load("stateAction.npy")
+
+def equal(a, b):
+    for i in range(len(a)):
+        for j in range(len(a[i])):
+            for k in range(len(a[i][j])):
+                if a[i][j][k] != b[i][j][k]:
+                    print("wrong!!!")
+    print("right")
+
+equal(StateActionPairs, StateActionPairs)
+equal(StateActionPairs, a)
+
+#save the archatecture
+
+jsn = json.dumps(saved_architecture.architectures)
+f = open("architectures.json","w")
+f.write(jsn)
+f.close()
+
+
+with open('architectures.json') as json_file:
+    eeeeex = json.load(json_file)
+
+
+if saved_architecture.architectures == eeeeex:
+    print("ayyaay")
 
 '''
 # generate random architecture and evaluate
