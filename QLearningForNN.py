@@ -589,7 +589,8 @@ def randArchiveUpdate():
 
 # get current epsilon given generation
 def epsilonDecay(gens):
-    return 1 - gens * 0.0001
+    return 1 - gens * 0.01
+
 
 def numToStrLength(num, length):
     if num > 999:
@@ -627,7 +628,7 @@ layers = [] #real
 makeMove(current_layer) #real
 
 
-while gens < 10:
+while gens < 100:
 
     #pick a next layer
     #print("\n\noutside - ", current_layer)
@@ -663,7 +664,8 @@ while gens < 10:
         gens = gens + 1
         #Do stuff the paper says
         randArchiveUpdate()
-        #epsilonDecay(gens)
+        epsilon = epsilonDecay(gens)
+        print("eps:", epsilon)
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
         #update(oldState, move, newState, 0)
