@@ -171,6 +171,18 @@ def add_layer(current, random):
                 temp.append(layer)
         else:
             temp.append(layer)
+            
+    next_layers = temp
+    
+    #if current layer is dense, next dense layer can have <= # nodes
+    if current['type'] == 'dense':
+        temp = []
+        for layer in next_layers:
+            if layer['type'] == 'dense':
+                if layer['dense_nodes'] <= current['dense_nodes']:
+                    temp.append(layer)
+            else:
+                temp.append(layer)
 
     next_layers = temp
             
