@@ -195,6 +195,18 @@ def add_layer(current, random):
                 temp.append(layer)
         else:
             temp.append(layer)
+            
+    next_layers = temp
+    
+    #if current layer is dense, next dense layer can have <= # nodes
+    if current['type'] == 'dense':
+        temp = []
+        for layer in next_layers:
+            if layer['type'] == 'dense':
+                if layer['dense_nodes'] <= current['dense_nodes']:
+                    temp.append(layer)
+            else:
+                temp.append(layer)
 
     next_layers = temp
             
@@ -616,7 +628,8 @@ def randArchiveUpdate():
 
 # get current epsilon given generation
 def epsilonDecay(gens):
-    return 1 - gens * 0.001
+    return 1 - gens * 0.01
+
 
 def numToStrLength(num, length):
     if num > 999:
@@ -654,7 +667,9 @@ layers = [] #real
 makeMove(current_layer) #real
 
 
-while gens < 1000:
+
+while gens < 100:
+
 
     #pick a next layer
     #print("\n\noutside - ", current_layer)
@@ -690,7 +705,10 @@ while gens < 1000:
         gens = gens + 1
         #Do stuff the paper says
         randArchiveUpdate()
-        epsilonDecay(gens)
+
+        epsilon = epsilonDecay(gens)
+        print("eps:", epsilon)
+
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
         #update(oldState, move, newState, 0)
