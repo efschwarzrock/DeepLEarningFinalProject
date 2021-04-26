@@ -5,12 +5,13 @@ from keras.callbacks import ModelCheckpoint
 import random as r
 import copy
 from saveArchitecture import saveArchitecture
+from scipy.io import loadmat
 
 #Chance of taking a random action
 epsilon = 1
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
-stepSize = 1
+stepSize = .1
 
 #discounting future rewards(i.e. is it beter to get 5 points now or 50 points in 200 moves, but 50 is uncertain)
 discount = .9
@@ -33,12 +34,34 @@ saved_architecture = saveArchitecture("a")
 current_layer = 0
 
 # Load the fashion-mnist pre-shuffled train data and test data
-(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+matTestData = loadmat('test_32x32.mat')
+
+
+x_test = np.array(matTestData['X'])
+x_test = np.transpose(x_test, (3, 0, 1, 2))
+y_test = np.array(matTestData['y'])
+y_test = y_test.reshape(y_test.shape[0])
+
+
+
+
+matTrainData = loadmat('train_32x32.mat')
+
+x_train = np.array(matTrainData['X'])
+x_train = np.transpose(x_train, (3, 0, 1, 2))
+y_train = np.array(matTrainData['y'])
+y_train = y_train.reshape(y_train.shape[0])
+
+
+
+#(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
+
 # x_test = np.reshape(np.load("fashion_mnist_test_images.npy"), (-1, 28 * 28))
 # y_test = np.load("fashion_mnist_test_labels.npy")
 # x_train = np.reshape(np.load("fashion_mnist_train_images.npy"), (-1, 28 * 28))
 # y_train = np.load("fashion_mnist_train_labels.npy")
 print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
+print("x_train shape:", x_test.shape, "y_train shape:", y_test.shape)
 
 # normalize
 x_train = x_train.astype('float32') / 255
@@ -49,15 +72,16 @@ x_test = x_test.astype('float32') / 255
 (y_train, y_valid) = y_train[5000:], y_train[:5000]
 
 # Reshape input data from (28, 28) to (28, 28, 1)
-w, h = 28, 28
-x_train = x_train.reshape(x_train.shape[0], w, h, 1)
-x_valid = x_valid.reshape(x_valid.shape[0], w, h, 1)
-x_test = x_test.reshape(x_test.shape[0], w, h, 1)
+w, h = 32, 32
+x_train = x_train.reshape(x_train.shape[0], w, h, 3)
+x_valid = x_valid.reshape(x_valid.shape[0], w, h, 3)
+x_test = x_test.reshape(x_test.shape[0], w, h, 3)
 
 # One-hot encode the labels
-y_train = tf.keras.utils.to_categorical(y_train, 10)
-y_valid = tf.keras.utils.to_categorical(y_valid, 10)
-y_test = tf.keras.utils.to_categorical(y_test, 10)
+print(y_train-1)
+y_train = tf.keras.utils.to_categorical(y_train-1, 10)
+y_valid = tf.keras.utils.to_categorical(y_valid-1, 10)
+y_test = tf.keras.utils.to_categorical(y_test-1, 10)
 
 # Print training set shape
 print("x_train shape:", x_train.shape, "y_train shape:", y_train.shape)
@@ -81,7 +105,7 @@ gens = 0
 its = 0
 
 #The input size of the next layer
-inputSize = 28
+inputSize = 32
 
 parameters = {
     "max_layers": 12,
@@ -237,10 +261,10 @@ def create_tf_layer(layer):
     layer_depth = layer['layer_depth']
     if layer_type == 'convolution' and layer_depth == 1:
         tf_layer = tf.keras.layers.Conv2D(filters=layer['num_filters'], kernel_size=layer['filter_size'],
-                                          strides=layer['stride'], padding='valid', input_shape=(28, 28, 1))
+                                          strides=layer['stride'], padding='valid', input_shape=(32, 32, 3))
     elif layer_type == 'pooling' and layer_depth == 1:
         tf_layer = tf.keras.layers.MaxPooling2D(pool_size=layer['pool_size'], strides=layer['stride'],
-                                                input_shape=(28, 28, 1))
+                                                input_shape=(32, 32, 3))
     elif layer_type == 'convolution':
         tf_layer = tf.keras.layers.Conv2D(filters=layer['num_filters'], kernel_size=layer['filter_size'],
                                           strides=layer['stride'], padding='valid')
@@ -537,6 +561,9 @@ def trainModel(layers):
         model = create_model(layers)
         accuracy = evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
         #accuracy = np.random.rand();
+        #for i in range(len(layers)):
+        #    if layers[i]['type'] == 'dense':
+        #        accuracy = accuracy + np.random.rand();
     return accuracy
 
 #get the first layer in the architecture
@@ -589,7 +616,7 @@ def randArchiveUpdate():
 
 # get current epsilon given generation
 def epsilonDecay(gens):
-    return 1 - gens * 0.0001
+    return 1 - gens * 0.001
 
 def numToStrLength(num, length):
     if num > 999:
@@ -627,7 +654,7 @@ layers = [] #real
 makeMove(current_layer) #real
 
 
-while gens < 10:
+while gens < 1000:
 
     #pick a next layer
     #print("\n\noutside - ", current_layer)
@@ -653,7 +680,7 @@ while gens < 10:
         #update the Q Values and give a reward of accuracy
         update(oldState, newState, accuracy);
 
-        inputSize = 28
+        inputSize = 32
         layers = []
         #print("after\n", StateActionPairs, "\n\n\n\n")
         #set back to original state and increase generation
@@ -663,7 +690,7 @@ while gens < 10:
         gens = gens + 1
         #Do stuff the paper says
         randArchiveUpdate()
-        #epsilonDecay(gens)
+        epsilonDecay(gens)
     else:
         #we don't need to so update the QValues with an accuracy of 0 becasue we got no reward since we aren't done
         #update(oldState, move, newState, 0)
