@@ -36,13 +36,10 @@ current_layer = 0
 # Load the fashion-mnist pre-shuffled train data and test data
 matTestData = loadmat('test_32x32.mat')
 
-
 x_test = np.array(matTestData['X'])
 x_test = np.transpose(x_test, (3, 0, 1, 2))
 y_test = np.array(matTestData['y'])
 y_test = y_test.reshape(y_test.shape[0])
-
-
 
 
 matTrainData = loadmat('train_32x32.mat')
@@ -51,7 +48,6 @@ x_train = np.array(matTrainData['X'])
 x_train = np.transpose(x_train, (3, 0, 1, 2))
 y_train = np.array(matTrainData['y'])
 y_train = y_train.reshape(y_train.shape[0])
-
 
 
 #(x_train, y_train), (x_test, y_test) = tf.keras.datasets.fashion_mnist.load_data()
@@ -199,11 +195,11 @@ def add_layer(current, random):
     next_layers = temp
     
     #if current layer is dense, next dense layer can have <= # nodes
-    if current['type'] == 'dense':
+    if current != 0 and current['type'] == 'dense':
         temp = []
         for layer in next_layers:
             if layer['type'] == 'dense':
-                if layer['dense_nodes'] <= current['dense_nodes']:
+                if layer['nodes'] <= current['nodes']:
                     temp.append(layer)
             else:
                 temp.append(layer)
