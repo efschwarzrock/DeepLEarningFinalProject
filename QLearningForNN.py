@@ -11,10 +11,10 @@ from scipy.io import loadmat
 epsilon = 1
 
 #How quickly to update Q Values(think how big the jumps are in grad decent)
-stepSize = .1
+stepSize = .001
 
 #discounting future rewards(i.e. is it beter to get 5 points now or 50 points in 200 moves, but 50 is uncertain)
-discount = .9
+discount = 1
 
 #the number of layer types
 NUMACTIONS = 19
@@ -109,7 +109,7 @@ parameters = {
     "conv_filter_sizes": [1, 3, 5],
     "conv_strides": [1],
     "pooling_sizes_strides": [(5, 3), (3, 2), (2, 2)],
-    "dense_consecutive": 2,
+    "dense_consecutive": 3,
     "dense_nodes": [128, 256, 512],
     "classes": 10
 }
@@ -567,7 +567,7 @@ def trainModel(layers):
     #otherwise, train the model
     else:
         model = create_model(layers)
-        accuracy = evaluate_model(model, 128, 1, x_train, y_train, x_valid, y_valid)
+        accuracy = evaluate_model(model, 128, 5, x_train, y_train, x_valid, y_valid)
         #accuracy = np.random.rand();
         #for i in range(len(layers)):
         #    if layers[i]['type'] == 'dense':
@@ -664,7 +664,7 @@ makeMove(current_layer) #real
 
 
 
-while gens < 100:
+while gens < 1000:
 
 
     #pick a next layer
