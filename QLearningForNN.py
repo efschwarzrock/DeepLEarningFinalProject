@@ -104,13 +104,13 @@ its = 0
 inputSize = 32
 
 parameters = {
-    "max_layers": 12,
-    "conv_num_filters": [64, 128, 256, 512],
-    "conv_filter_sizes": [1, 3, 5],
+    "max_layers": 6,
+    "conv_num_filters": [64, 128],
+    "conv_filter_sizes": [3, 5],
     "conv_strides": [1],
-    "pooling_sizes_strides": [(5, 3), (3, 2), (2, 2)],
-    "dense_consecutive": 3,
-    "dense_nodes": [128, 256, 512],
+    "pooling_sizes_strides": [(5, 3), (3, 2)],
+    "dense_consecutive": 2,
+    "dense_nodes": [32, 64, 128],
     "classes": 10
 }
 
@@ -163,16 +163,12 @@ def add_layer(current, random):
     # if at max depth, return termination state
     elif current_depth == parameters['max_layers'] - 1:
         next_layers = layers['termination']
-    # if at convolution, can go to anything (can only go to dense if representation size is bin 1 or 2)
-    elif current['type'] == 'convolution' and current['representation_size'] < 3:
+    # if at convolution, can go to anything=
+    elif current['type'] == 'convolution':
         next_layers = layers['convolution'] + layers['pooling'] + layers['dense'] + layers['termination']
-    elif current['type'] == 'convolution' and current['representation_size'] >=3:
-        next_layers = layers['convolution'] + layers['pooling'] + layers['termination']
-    # if at pooling, can go to anything but pooling (can only go to dense if representation size is bin 1 or 2)
-    elif current['type'] == 'pooling' and current['representation_size'] < 3:
+    # if at pooling, can go to anything but pooling
+    elif current['type'] == 'pooling':
         next_layers = layers['convolution'] + layers['dense'] + layers['termination']
-    elif current['type'] == 'pooling' and current['representation_size'] >=3:
-        next_layers = layers['convolution'] + layers['termination']
     # if at dense and not at max fully connected, can go to another dense or termination
     elif current['type'] == 'dense' and current['consecutive'] != parameters['dense_consecutive']:
         next_layers = layers['dense'] + layers['termination']
@@ -624,9 +620,11 @@ def randArchiveUpdate():
 
 # get current epsilon given generation
 def epsilonDecay(gens):
-    return 1 - gens * 0.01
-
-
+    if gens < 500: 
+        return 1
+    else:
+        return 1 - (int((gens - 500) / 100) * .1)
+    
 def numToStrLength(num, length):
     if num > 999:
         num = 999
@@ -663,8 +661,7 @@ layers = [] #real
 makeMove(current_layer) #real
 
 
-
-while gens < 1000:
+while gens < 1500:
 
 
     #pick a next layer
