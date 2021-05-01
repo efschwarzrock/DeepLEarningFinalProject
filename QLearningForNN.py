@@ -17,16 +17,16 @@ stepSize = .001
 discount = 1
 
 #the number of layer types
-NUMACTIONS = 19
+NUMACTIONS = 10
 
 #the number of termination layers
 NumTerminationActions = 1
 
 #number of states we can be in
-NUMSTATES = 48
+NUMSTATES = 21
 
 #max number of layers
-MAXLAYERS = 12
+MAXLAYERS = 6
 
 #Dictionary to store the architecture
 saved_architecture = saveArchitecture("a")
@@ -325,12 +325,12 @@ def evaluate_model(model, batch_size, epochs, x_train, y_train, x_val, y_val):
 
 def getConvolutionStateIndex(state):
 
-    RecepFieldSize = state['filter_size'] #{1, 3, 5}
+    RecepFieldSize = state['filter_size'] #[3, 5]
     #the index of the size
     RecepFieldSizeI = 0
 
 
-    NumRecepFields = state['num_filters'] #{64, 128, 256, 512}
+    NumRecepFields = state['num_filters'] #[64, 128]
     #index of the numRecepFields
     NumRecepFieldsI = 0
 
@@ -338,23 +338,18 @@ def getConvolutionStateIndex(state):
     RepSize = state['representation_size'] - 1 #{(∞, 8], (8, 4], (4, 1]}
 
 
-    if RecepFieldSize == 1:
+    if RecepFieldSize == 3:
         RecepFieldSizeI = 0
-    elif RecepFieldSize == 3:
-        RecepFieldSizeI = 1
     elif RecepFieldSize == 5:
-        RecepFieldSizeI = 2
+        RecepFieldSizeI = 1
 
     if NumRecepFields == 64:
         NumRecepFieldsI = 0
     elif NumRecepFields == 128:
         NumRecepFieldsI = 1
-    elif NumRecepFields == 256:
-        NumRecepFieldsI = 2
-    elif NumRecepFields == 512:
-        NumRecepFieldsI = 3
 
-    ret = RecepFieldSizeI*12 + NumRecepFieldsI*3 + RepSize
+
+    ret = RecepFieldSizeI*4 + NumRecepFieldsI*2 + RepSize
 
     return ret
 
@@ -371,30 +366,25 @@ def getConvolutionActionIndex(action):
 
 
 
-    if RecepFieldSize == 1:
+    if RecepFieldSize == 3:
         RecepFieldSizeI = 0
-    elif RecepFieldSize == 3:
-        RecepFieldSizeI = 1
     elif RecepFieldSize == 5:
-        RecepFieldSizeI = 2
+        RecepFieldSizeI = 1
 
     if NumRecepFields == 64:
         NumRecepFieldsI = 0
     elif NumRecepFields == 128:
         NumRecepFieldsI = 1
-    elif NumRecepFields == 256:
-        NumRecepFieldsI = 2
-    elif NumRecepFields == 512:
-        NumRecepFieldsI = 3
 
-    ret = RecepFieldSizeI*4 + NumRecepFieldsI
+
+    ret = RecepFieldSizeI*2 + NumRecepFieldsI
 
     return ret
 
 
 def getPoolingStateIndex(state):
 
-    RecepFieldSize = state['pool_size']  # {(5, 3),(3, 2),(2, 2)}
+    RecepFieldSize = state['pool_size']  # [(5, 3), (3, 2)]
     # the index of the size
     RecepFieldSizeI = 0
 
@@ -402,14 +392,12 @@ def getPoolingStateIndex(state):
     RepSize = state['representation_size'] - 1 # {(∞, 8], (8, 4], (4, 1]}
 
 
-    if RecepFieldSize == 1:
+    if RecepFieldSize == 3:
         RecepFieldSizeI = 0
-    elif RecepFieldSize == 3:
-        RecepFieldSizeI = 1
     elif RecepFieldSize == 5:
-        RecepFieldSizeI = 2
+        RecepFieldSizeI = 1
 
-    ret = 3*3*4 + RecepFieldSizeI*3 + RepSize
+    ret = 3*2*2 + RecepFieldSizeI*3 + RepSize
 
     return ret
 
@@ -421,45 +409,43 @@ def getPoolingActionIndex(action):
     RecepFieldSizeI = 0
 
 
-    if RecepFieldSize == 1:
-        RecepFieldSizeI = 0
-    elif RecepFieldSize == 3:
+    if RecepFieldSize == 3:
         RecepFieldSizeI = 1
     elif RecepFieldSize == 5:
         RecepFieldSizeI = 2
 
-    ret = 3*4 + RecepFieldSizeI
+    ret = 2*2 + RecepFieldSizeI
 
     return ret
 
 
 def getFullStateIndex(state):
 
-    NumNeurons = state['nodes'] # {512, 256, 128}
+    NumNeurons = state['nodes'] # [32, 64, 128]
     NumNeuronsI = 0
 
-    if NumNeurons == 512:
+    if NumNeurons == 128:
         NumNeuronsI = 0
-    elif NumNeurons == 256:
+    elif NumNeurons == 64:
         NumNeuronsI = 1
-    elif NumNeurons == 128:
+    elif NumNeurons == 32:
             NumNeuronsI = 2
-    ret = 3*3*4 + 3*3 + NumNeuronsI
+    ret = 3*2*2 + 3*2 + NumNeuronsI
 
     return ret
 
 def getFullActionIndex(action):
 
-    NumNeurons = action['nodes'] # {512, 256, 128}
+    NumNeurons = action['nodes'] # [32, 64, 128]
     NumNeuronsI = 0
 
-    if NumNeurons == 512:
+    if NumNeurons == 128:
         NumNeuronsI = 0
-    elif NumNeurons == 256:
+    elif NumNeurons == 64:
         NumNeuronsI = 1
-    elif NumNeurons == 128:
+    elif NumNeurons == 32:
             NumNeuronsI = 2
-    ret = 3*4 + 3 + NumNeuronsI
+    ret = 2*2 + 2 + NumNeuronsI
 
     return ret
 
@@ -468,7 +454,7 @@ def getTerminationStateIndex(state):
     return 300
 
 def getTerminationActionIndex(action):
-    return 18
+    return 9
 
 def getStateIndex(state):
     if state['type'] == 'convolution':
